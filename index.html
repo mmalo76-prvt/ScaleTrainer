@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gitarren-Skalen Trainer</title>
+	<link rel="manifest" href="manifest.json">
+	<meta name="theme-color" content="#1e1e1e">
+	<link rel="apple-touch-icon" href="icon-192x192.png">
+    <!-- Tailwind CSS für modernes, responsives Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        /* Eigene Scrollbar für das Griffbrett (Mobile Ansicht) */
+        .fretboard-container::-webkit-scrollbar {
+            height: 10px;
+        }
+        .fretboard-container::-webkit-scrollbar-track {
+            background: #e5e7eb; 
+            border-radius: 8px;
+        }
+        .fretboard-container::-webkit-scrollbar-thumb {
+            background: #9ca3af; 
+            border-radius: 8px;
+        }
+        .fretboard-container::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; 
+        }
+        
+        /* Animation für das Aufleuchten der aktiven Skalen-Punkte */
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            70% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .note-dot {
+            animation: popIn 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <header class="text-center space-y-2 mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 tracking-tight">🎸 Skalen & Tempo Trainer</h1>
+            <p class="text-gray-500">Meistere die Pentatonik auf dem gesamten Griffbrett.</p>
+        </header>
+
+        <!-- Hauptbereich: Steuerung und Griffbrett -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-8">
+            
+            <!-- Skalen Auswahl -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="key-select" class="block text-sm font-semibold text-gray-700 mb-2">Grundton</label>
+                    <select id="key-select" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
+                        <option value="9">A</option>
+                        <option value="10">A# / Bb</option>
+                        <option value="11">B (H)</option>
+                        <option value="0" selected>C</option>
+                        <option value="1">C# / Db</option>
+                        <option value="2">D</option>
+                        <option value="3">D# / Eb</option>
+                        <option value="4">E</option>
+                        <option value="5">F</option>
+                        <option value="6">F# / Gb</option>
+                        <option value="7">G</option>
+                        <option value="8">G# / Ab</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="scale-select" class="block text-sm font-semibold text-gray-700 mb-2">Tonleiter</label>
+                    <select id="scale-select" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
+                        <option value="major">Dur-Pentatonik (Major / 5 Töne)</option>
+                        <option value="minor" selected>Moll-Pentatonik (Minor / 5 Töne)</option>
+                        <option value="full_major">Dur-Tonleiter (Ionisch / 7 Töne)</option>
+                        <option value="full_minor">Natürliches Moll (Äolisch / 7 Töne)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Legende -->
+            <div class="flex items-center gap-4 text-sm justify-center md:justify-start">
+                <div class="flex items-center gap-1"><span class="w-4 h-4 rounded-full bg-red-500 shadow-inner"></span> Grundton (Root)</div>
+                <div class="flex items-center gap-1"><span class="w-4 h-4 rounded-full bg-blue-500 shadow-inner"></span> Skalenton</div>
+            </div>
+
+            <!-- Fretboard (Griffbrett) Visualisierung -->
+            <div class="fretboard-container w-full overflow-x-auto pb-4 rounded-lg">
+                <!-- Container für das Holz und das Grid -->
+                <div class="relative min-w-[900px] h-[240px] bg-[#3e2723] rounded shadow-inner border-l-[12px] border-gray-200" id="fretboard-wrapper">
+                    
+                    <!-- Fret Marker (Punkte auf dem Griffbrett) -->
+                    <div id="fret-markers" class="absolute inset-0 z-0"></div>
+
+                    <!-- Gitarrensaiten (horizontal) -->
+                    <div id="strings-container" class="absolute inset-0 z-10 pointer-events-none"></div>
+
+                    <!-- Raster für die Bünde und Noten -->
+                    <!-- 16 Spalten (Leersaite + 15 Bünde), 6 Zeilen (Saiten) -->
+                    <div id="fretboard-grid" class="absolute inset-0 z-20 grid grid-cols-[repeat(16,1fr)] grid-rows-[repeat(6,1fr)]">
+                        <!-- Wird per JavaScript generiert -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metronom & Tempo Trainer -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                ⏱️ Metronom & Tempo Trainer
+            </h2>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                <!-- Basis Metronom -->
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <label class="text-sm font-semibold text-gray-700">Tempo (BPM)</label>
+                        <span id="bpm-display" class="text-3xl font-bold text-blue-600 w-16 text-right">120</span>
+                    </div>
+                    
+                    <input type="range" id="bpm-slider" min="40" max="240" value="120" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                    
+                    <div class="flex gap-4">
+                        <button id="btn-minus" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 rounded font-bold text-gray-700 transition">-5</button>
+                        <button id="btn-plus" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 rounded font-bold text-gray-700 transition">+5</button>
+                    </div>
+
+                    <button id="btn-play" class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-lg shadow-md transition-colors flex justify-center items-center gap-2">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                        Metronom Starten
+                    </button>
+                </div>
+
+                <!-- Tempo Trainer -->
+                <div class="bg-blue-50/50 p-5 rounded-xl border border-blue-100 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-bold text-gray-800 text-sm">Trainer Modus</h3>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="trainer-toggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+                    
+                    <p class="text-sm text-gray-600">Erhöht automatisch das Tempo, damit du Geschwindigkeit aufbauen kannst.</p>
+                    
+                    <div class="grid grid-cols-2 gap-4 pt-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Erhöhung (+BPM)</label>
+                            <input type="number" id="trainer-increment" value="5" min="1" max="20" class="w-full bg-white border border-gray-300 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50" disabled>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Alle X Schläge</label>
+                            <input type="number" id="trainer-beats" value="16" min="4" max="100" class="w-full bg-white border border-gray-300 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50" disabled>
+                        </div>
+                    </div>
+
+                    <!-- Fortschrittsbalken für Trainer -->
+                    <div class="pt-2">
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                            <div id="trainer-progress" class="bg-blue-600 h-2.5 rounded-full transition-all duration-100" style="width: 0%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1 text-right"><span id="trainer-beats-count">0</span> / <span id="trainer-beats-target">16</span> Schläge</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JavaScript Logik -->
+    <script>
+        /* =========================================
+           MUSIK THEORIE & DATEN
+           ========================================= */
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        
+        // Standard-Tuning (E2, A2, D3, G3, B3, E4) von hoch (String 1) nach tief (String 6)
+        // Indizes in der noteNames-Array
+        const stringTuning = [
+            4,  // Saite 1: E (hoch)
+            11, // Saite 2: B / H
+            7,  // Saite 3: G
+            2,  // Saite 4: D
+            9,  // Saite 5: A
+            4   // Saite 6: E (tief)
+        ];
+
+        // Intervalle für Pentatonik (in Halbtönen ab dem Grundton)
+        const scaleIntervals = {
+            'major': [0, 2, 4, 7, 9], // 1, 2, 3, 5, 6
+            'minor': [0, 3, 5, 7, 10], // 1, b3, 4, 5, b7
+            'full_major': [0, 2, 4, 5, 7, 9, 11], // 1, 2, 3, 4, 5, 6, 7 (Ionisch)
+            'full_minor': [0, 2, 3, 5, 7, 8, 10]  // 1, 2, b3, 4, 5, b6, b7 (Äolisch)
+        };
+
+        const NUM_FRETS = 15; // Leersaite + 15 Bünde
+
+        /* =========================================
+           GRIFFBRETT ZEICHNEN
+           ========================================= */
+        const grid = document.getElementById('fretboard-grid');
+        const keySelect = document.getElementById('key-select');
+        const scaleSelect = document.getElementById('scale-select');
+
+        function drawFretboardBackground() {
+            // Saiten zeichnen
+            const stringsContainer = document.getElementById('strings-container');
+            stringsContainer.innerHTML = '';
+            for (let i = 0; i < 6; i++) {
+                const stringLine = document.createElement('div');
+                // Dickere Saiten für tiefe Töne (unten)
+                const thickness = 1 + (i * 0.4); 
+                stringLine.className = 'absolute w-full bg-gray-300 shadow-sm';
+                stringLine.style.height = `${thickness}px`;
+                // Zentriert in der jeweiligen Raster-Zeile (16.66% pro Zeile)
+                stringLine.style.top = `calc(${(i * 100) / 6}% + ${(100 / 6) / 2}%)`;
+                stringsContainer.appendChild(stringLine);
+            }
+
+            // Fret-Marker (Inlays) zeichnen
+            const markersContainer = document.getElementById('fret-markers');
+            markersContainer.innerHTML = '';
+            // Marker auf Bünden 3, 5, 7, 9, 12, 15
+            const markerFrets = [3, 5, 7, 9, 12, 15];
+            markerFrets.forEach(fret => {
+                const isDouble = fret === 12;
+                // X-Position berechnen: Mitte des jeweiligen Bundes im CSS Grid
+                // Leersaite ist Spalte 0 (ca 6.25% Breite)
+                // Bund N ist Spalte N
+                const leftPos = `calc(${fret * (100 / (NUM_FRETS + 1))}% + ${(100 / (NUM_FRETS + 1)) / 2}%)`;
+
+                if (isDouble) {
+                    // Zwei Punkte (oben und unten)
+                    const dot1 = document.createElement('div');
+                    dot1.className = 'absolute w-4 h-4 bg-gray-400/40 rounded-full transform -translate-x-1/2 -translate-y-1/2';
+                    dot1.style.left = leftPos;
+                    dot1.style.top = '33%';
+                    
+                    const dot2 = document.createElement('div');
+                    dot2.className = 'absolute w-4 h-4 bg-gray-400/40 rounded-full transform -translate-x-1/2 -translate-y-1/2';
+                    dot2.style.left = leftPos;
+                    dot2.style.top = '66%';
+                    
+                    markersContainer.appendChild(dot1);
+                    markersContainer.appendChild(dot2);
+                } else {
+                    // Ein Punkt in der Mitte
+                    const dot = document.createElement('div');
+                    dot.className = 'absolute w-4 h-4 bg-gray-400/40 rounded-full transform -translate-x-1/2 -translate-y-1/2';
+                    dot.style.left = leftPos;
+                    dot.style.top = '50%';
+                    markersContainer.appendChild(dot);
+                }
+            });
+        }
+
+        function updateScale() {
+            grid.innerHTML = '';
+            const rootNoteIndex = parseInt(keySelect.value);
+            const scaleType = scaleSelect.value;
+            const targetIntervals = scaleIntervals[scaleType];
+            
+            // Berechne alle absoluten Noten-Indizes der aktuellen Tonleiter
+            const activeNotes = targetIntervals.map(interval => (rootNoteIndex + interval) % 12);
+
+            for (let stringIdx = 0; stringIdx < 6; stringIdx++) {
+                const openNoteIndex = stringTuning[stringIdx];
+
+                for (let fret = 0; fret <= NUM_FRETS; fret++) {
+                    const currentNoteIndex = (openNoteIndex + fret) % 12;
+                    const isLeersaite = fret === 0;
+
+                    const cell = document.createElement('div');
+                    cell.className = 'relative flex items-center justify-center';
+                    
+                    // Bundstäbchen (rechter Rand)
+                    if (!isLeersaite) {
+                        cell.style.borderRight = '2px solid rgba(200, 200, 200, 0.6)';
+                    } else {
+                        // Sattel dunkler machen
+                        cell.className += ' bg-black/30';
+                    }
+
+                    // Prüfen ob die Note zur Tonleiter gehört
+                    if (activeNotes.includes(currentNoteIndex)) {
+                        const isRoot = currentNoteIndex === rootNoteIndex;
+                        const noteName = noteNames[currentNoteIndex];
+                        
+                        const dot = document.createElement('div');
+                        // Styling der Note
+                        dot.className = `note-dot absolute z-30 w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-md border-2 border-white/20
+                            ${isRoot ? 'bg-red-500' : 'bg-blue-500'}`;
+                        dot.textContent = noteName;
+                        
+                        // Wenn Leersaite, Note links platzieren, ansonsten zentriert im Bund
+                        if (isLeersaite) {
+                            dot.style.left = '20%';
+                        }
+                        
+                        cell.appendChild(dot);
+                    }
+                    
+                    grid.appendChild(cell);
+                }
+            }
+        }
+
+        /* =========================================
+           METRONOM & TEMPO TRAINER (Web Audio API)
+           ========================================= */
+        let audioContext;
+        let isPlaying = false;
+        
+        let bpm = 120;
+        let currentBeat = 0;
+        let nextNoteTime = 0.0;
+        let timerID;
+
+        // Trainer State
+        let trainerEnabled = false;
+        let trainerIncrement = 5;
+        let trainerTargetBeats = 16;
+        let totalBeatsPlayed = 0;
+
+        const bpmSlider = document.getElementById('bpm-slider');
+        const bpmDisplay = document.getElementById('bpm-display');
+        const btnPlay = document.getElementById('btn-play');
+        const btnMinus = document.getElementById('btn-minus');
+        const btnPlus = document.getElementById('btn-plus');
+
+        const trainerToggle = document.getElementById('trainer-toggle');
+        const inputTrainerIncrement = document.getElementById('trainer-increment');
+        const inputTrainerBeats = document.getElementById('trainer-beats');
+        const progressTrainer = document.getElementById('trainer-progress');
+        const textTrainerCount = document.getElementById('trainer-beats-count');
+        const textTrainerTarget = document.getElementById('trainer-beats-target');
+
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Frequenz und Sound des Klicks generieren
+        function scheduleNote(beatNumber, time) {
+            const osc = audioContext.createOscillator();
+            const envelope = audioContext.createGain();
+
+            osc.connect(envelope);
+            envelope.connect(audioContext.destination);
+
+            // Akzent auf dem ersten Schlag (4/4 Takt)
+            if (beatNumber === 0) {
+                osc.frequency.value = 1200.0; // Hoher Ton
+            } else {
+                osc.frequency.value = 800.0;  // Normaler Ton
+            }
+
+            envelope.gain.value = 1;
+            envelope.gain.exponentialRampToValueAtTime(1, time + 0.001);
+            envelope.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+
+            osc.start(time);
+            osc.stop(time + 0.05);
+        }
+
+        function updateBPM(newBpm) {
+            bpm = Math.min(240, Math.max(40, newBpm));
+            bpmSlider.value = bpm;
+            bpmDisplay.innerText = bpm;
+        }
+
+        function handleTempoTrainer() {
+            if (!trainerEnabled) return;
+            
+            totalBeatsPlayed++;
+            textTrainerCount.innerText = totalBeatsPlayed;
+            
+            // Progress Bar Update
+            const percent = (totalBeatsPlayed / trainerTargetBeats) * 100;
+            progressTrainer.style.width = `${percent}%`;
+
+            if (totalBeatsPlayed >= trainerTargetBeats) {
+                // Tempo erhöhen
+                updateBPM(bpm + trainerIncrement);
+                totalBeatsPlayed = 0;
+                
+                // Visuelles Feedback
+                bpmDisplay.classList.add('text-red-500', 'scale-110');
+                setTimeout(() => {
+                    bpmDisplay.classList.remove('text-red-500', 'scale-110');
+                    progressTrainer.style.width = '0%';
+                }, 300);
+            }
+        }
+
+        function nextNote() {
+            const secondsPerBeat = 60.0 / bpm;
+            nextNoteTime += secondsPerBeat;
+            
+            currentBeat++;
+            if (currentBeat >= 4) {
+                currentBeat = 0;
+            }
+            
+            handleTempoTrainer();
+        }
+
+        // Hochpräziser Scheduler (Lookahead)
+        function scheduler() {
+            while (nextNoteTime < audioContext.currentTime + 0.1) {
+                scheduleNote(currentBeat, nextNoteTime);
+                nextNote();
+            }
+            timerID = setTimeout(scheduler, 25.0);
+        }
+
+        function togglePlay() {
+            if (isPlaying) {
+                clearTimeout(timerID);
+                isPlaying = false;
+                btnPlay.innerHTML = `<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg> Metronom Starten`;
+                btnPlay.classList.replace('bg-red-600', 'bg-blue-600');
+                btnPlay.classList.replace('hover:bg-red-700', 'hover:bg-blue-700');
+            } else {
+                initAudio();
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                
+                // Reset State
+                currentBeat = 0;
+                totalBeatsPlayed = 0;
+                textTrainerCount.innerText = "0";
+                progressTrainer.style.width = "0%";
+                
+                nextNoteTime = audioContext.currentTime + 0.05;
+                scheduler();
+                
+                isPlaying = true;
+                btnPlay.innerHTML = `<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"></path></svg> Stop`;
+                btnPlay.classList.replace('bg-blue-600', 'bg-red-600');
+                btnPlay.classList.replace('hover:bg-blue-700', 'hover:bg-red-700');
+            }
+        }
+
+        /* =========================================
+           EVENT LISTENERS
+           ========================================= */
+        
+        // Griffbrett Updates
+        keySelect.addEventListener('change', updateScale);
+        scaleSelect.addEventListener('change', updateScale);
+
+        // Metronom Controls
+        bpmSlider.addEventListener('input', (e) => {
+            updateBPM(parseInt(e.target.value));
+        });
+        
+        btnMinus.addEventListener('click', () => updateBPM(bpm - 5));
+        btnPlus.addEventListener('click', () => updateBPM(bpm + 5));
+        btnPlay.addEventListener('click', togglePlay);
+
+        // Tempo Trainer Controls
+        trainerToggle.addEventListener('change', (e) => {
+            trainerEnabled = e.target.checked;
+            inputTrainerIncrement.disabled = !trainerEnabled;
+            inputTrainerBeats.disabled = !trainerEnabled;
+            
+            // Reset Progress when toggled
+            totalBeatsPlayed = 0;
+            textTrainerCount.innerText = "0";
+            progressTrainer.style.width = "0%";
+        });
+
+        inputTrainerIncrement.addEventListener('change', (e) => {
+            trainerIncrement = parseInt(e.target.value) || 5;
+        });
+
+        inputTrainerBeats.addEventListener('change', (e) => {
+            trainerTargetBeats = parseInt(e.target.value) || 16;
+            textTrainerTarget.innerText = trainerTargetBeats;
+        });
+
+
+        /* =========================================
+           INITIALISIERUNG
+           ========================================= */
+        window.addEventListener('DOMContentLoaded', () => {
+            drawFretboardBackground();
+            updateScale();
+            
+            // Resize Handler um responsive Probleme zu vermeiden
+            window.addEventListener('resize', () => {
+                // Keine echte Notwendigkeit neu zu rendern, da CSS Grid genutzt wird
+                // Das Layout passt sich dank relativer % und fr-Einheiten an.
+            });
+        });
+
+    </script>
+	<script>
+		if ('serviceWorker' in navigator) {
+			window.addEventListener('load', () => {
+			navigator.serviceWorker.register('./sw.js')
+				.then((registration) => {
+				console.log('ServiceWorker registriert:', registration.scope);
+				})
+				.catch((error) => {
+				console.log('ServiceWorker Fehler:', error);
+				});
+			});
+		}
+	</script>
+</body>
+</html>
